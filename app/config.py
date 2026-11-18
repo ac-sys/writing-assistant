@@ -13,7 +13,7 @@ LOCAL_MODELS = {
 }
 PRESETS = {
     "groq": {"label": "Groq (recommended: free tier, fast)", "api_base": "https://api.groq.com/openai/v1",
-             "api_model": "llama-3.3-70b-versatile", "key_url": "https://console.groq.com/keys", "env": "GROQ_API_KEY"},
+             "api_model": "openai/gpt-oss-120b", "key_url": "https://console.groq.com/keys", "env": "GROQ_API_KEY"},
     "openai": {"label": "OpenAI", "api_base": "https://api.openai.com/v1", "api_model": "gpt-4o-mini",
                "key_url": "https://platform.openai.com/api-keys", "env": "OPENAI_API_KEY"},
     "xai": {"label": "xAI Grok", "api_base": "https://api.x.ai/v1", "api_model": "grok-3-mini",
@@ -23,11 +23,11 @@ PRESETS = {
 }
 DEFAULTS = {
     "local_model": "Qwen/Qwen2.5-0.5B-Instruct",
-    "local_quant": "int8",
+    "local_quant": "bfloat16",
     "use_api": False,
     "api_base": "https://api.groq.com/openai/v1",
     "api_key": "",
-    "api_model": "llama-3.3-70b-versatile",
+    "api_model": "openai/gpt-oss-120b",
     "api_timeout": 90,
 }
 _LOCK = threading.Lock()

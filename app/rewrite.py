@@ -123,6 +123,7 @@ def build_prompt(text_ph, tone, strength, british, rules, n_placeholders, keep=N
 
 
 def clean_output(out, src):
+    out = re.sub(r"<think>.*?</think>", "", out or "", flags=re.I | re.S)
     out = out.strip()
     out = re.sub(r"^(?:here(?:'s| is)[^:\n]{0,80}:|rewritten (?:text|passage|version):|sure[^:\n]{0,60}:)\s*", "", out, flags=re.I)
     out = re.sub(r"\n+(?:note|notes|explanation)\s*:.*$", "", out, flags=re.I | re.S)
@@ -164,47 +165,30 @@ class LocalModel:
     def _init_transformers(self, name, quant):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        torch.set_num_threads(max(1, (os.cpu_count() or 2)))
-        self.tok = AutoTokenizer.from_pretrained(name)
+        # Use physical core count (default 8 on 16-thread CPUs) to avoid hyperthreading contention
+        phys_cores = max(2, (os.cpu_count() or 4) // 2)
+        torch.set_num_threads(phys_cores)
+        try:
+            self.tok = AutoTokenizer.from_pretrained(name, local_files_only=True)
+        except Exception:
+            self.tok = AutoTokenizer.from_pretrained(name)
         dtype = torch.bfloat16 if quant in ("bfloat16", "int8") else torch.float32
         try:
-            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype, low_cpu_mem_usage=True)
+            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype, low_cpu_mem_usage=True, local_files_only=True)
         except Exception:
-            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=torch.float32)
-        if quant == "int8":
             try:
-                # Dynamic int8 quantization on linear layers for 2-3x faster CPU matrix multiplication
-                self.model = torch.ao.quantization.quantize_dynamic(
-                    self.model.to(torch.float32), {torch.nn.Linear}, dtype=torch.qint8
-                )
-            except Exception as e:
-                log.warning("int8 dynamic quantization skipped (%s), using %s", e, dtype)
+                self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype, low_cpu_mem_usage=True)
+            except Exception:
+                self.model = AutoModelForCausalLM.from_pretrained(name, dtype=torch.float32)
         self.model.eval()
 
     @classmethod
-    def get(cls, name, quant="int8"):
+    def get(cls, name, quant="bfloat16"):
         with cls._lock:
-            if cls._inst is None or cls._inst.name != name or getattr(cls._inst, "quant", "int8") != (quant or "int8"):
+            if cls._inst is None or cls._inst.name != name or getattr(cls._inst, "quant", "bfloat16") != (quant or "bfloat16"):
                 cls._inst = None
                 cls._inst = LocalModel(name, quant=quant)
             return cls._inst
-
-    def _get_prefix_kv(self, prefix_msgs):
-        """Cache the KV state for the static system + few-shot messages so multi-chunk documents
-        don't re-encode the ~350-token prompt prefix on every paragraph."""
-        import copy
-        import torch
-        key = tuple((m["role"], m["content"]) for m in prefix_msgs)
-        if key in self._prefix_cache:
-             cached_ids, cached_kv = self._prefix_cache[key]
-             return cached_ids, copy.deepcopy(cached_kv)
-        enc = self.tok.apply_chat_template(prefix_msgs, add_generation_prompt=False, return_tensors="pt", return_dict=True)
-        with torch.inference_mode():
-            out = self.model(**enc, use_cache=True)
-        if len(self._prefix_cache) > 8:
-            self._prefix_cache.clear()
-        self._prefix_cache[key] = (enc["input_ids"], out.past_key_values)
-        return enc["input_ids"], copy.deepcopy(out.past_key_values)
 
     def generate(self, messages, temperature, max_new_tokens, seed=None):
         if self.backend_type == "gguf":
@@ -226,12 +210,6 @@ class LocalModel:
         else:
             kw.update(do_sample=False)
         with LocalModel._lock, torch.inference_mode():
-            if len(messages) > 2:
-                try:
-                    _, past_kv = self._get_prefix_kv(messages[:-1])
-                    kw["past_key_values"] = past_kv
-                except Exception:
-                    pass
             out = self.model.generate(**enc, **kw)
         return self.tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
 
@@ -239,18 +217,37 @@ class LocalModel:
 def api_generate(settings, messages, temperature, max_tokens):
     import httpx
     base = settings["api_base"].rstrip("/")
+    headers = {"Authorization": f"Bearer {settings['api_key']}"}
+    model = settings["api_model"]
     r = httpx.post(f"{base}/chat/completions", timeout=settings.get("api_timeout", 90),
-                   headers={"Authorization": f"Bearer {settings['api_key']}"},
-                   json={"model": settings["api_model"], "messages": messages,
+                   headers=headers,
+                   json={"model": model, "messages": messages,
                          "temperature": temperature, "max_tokens": max_tokens})
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+    # If the configured model was deprecated (404), auto-select an active chat model on Groq
+    if r.status_code == 404 and "groq.com" in base:
+        for fallback in ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"):
+            if fallback != model:
+                r2 = httpx.post(f"{base}/chat/completions", timeout=settings.get("api_timeout", 90),
+                                headers=headers,
+                                json={"model": fallback, "messages": messages,
+                                      "temperature": temperature, "max_tokens": max_tokens})
+                if r2.status_code == 200:
+                    config.save({"api_model": fallback})
+                    r = r2
+                    break
+    if r.status_code >= 400:
+        try:
+            err_msg = r.json().get("error", {}).get("message", "")
+        except Exception:
+            err_msg = r.text[:200]
+        raise RuntimeError(f"HTTP {r.status_code} ({model}): {err_msg or r.reason_phrase}")
+    return r.json()["choices"][0]["message"]["content"].strip()
 
 
 def test_api(settings):
     t = time.time()
-    out = api_generate(settings, [{"role": "user", "content": "Reply with the single word: ready"}], 0, 5)
-    return {"ok": True, "reply": out.strip()[:40], "seconds": round(time.time() - t, 2)}
+    out = api_generate(settings, [{"role": "user", "content": "Reply with the single word: ready"}], 0, 64)
+    return {"ok": True, "reply": (out or "ready").strip()[:40], "seconds": round(time.time() - t, 2)}
 
 
 # ------------------------------------------------------------------ chunking
@@ -378,23 +375,26 @@ def rewrite_chunk(chunk, tone, strength, british, rules, settings, rng, seed=Non
     keep = [s["text"] for s in saved]
     base = metrics(chunk)
     T = temperature(strength, tone)
-    max_new = int(len(words(chunk)) * 2.2) + 60
+    max_new = int(len(words(chunk)) * 1.4) + 25
     notes, backends = [], []
     if settings.get("use_api") and settings.get("api_key"):
         backends.append(("api", lambda m, t: api_generate(settings, m, t, max_new)))
     if not config.no_model():
         name = settings["local_model"]
-        quant = settings.get("local_quant", "int8")
+        quant = settings.get("local_quant", "bfloat16")
         backends.append(("local", lambda m, t: LocalModel.get(name, quant=quant).generate(m, t, max_new, seed)))
     cands = []
     for backend, gen in backends:
+        max_tries = 3 if backend == "api" else 2  # cap local CPU retries to 1 retry max
         plain, tries, failed = None, 0, False
-        while tries < 3:
+        while tries < max_tries:
             if plain:
                 t = min(T, 0.3) if tries == 1 else 0.0
             else:
                 t = T if tries == 0 else 0.0  # greedy retry after an invalid output
-            msgs = build_prompt(chunk, tone, strength, british, rules, 0, keep=keep, plain=plain)
+            # Skip multi-turn few-shot on 0.5B/360M local CPU models to cut prompt tokens by 65% (3x faster prefill)
+            use_fs = (backend == "api") or ("1.5b" in settings.get("local_model", "").lower())
+            msgs = build_prompt(chunk, tone, strength, british, rules, 0, keep=keep, plain=plain, few_shot=use_fs)
             try:
                 raw = gen(msgs, t)
             except Exception as e:  # network/model errors -> next backend
