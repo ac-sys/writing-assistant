@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing Assistant</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1d2433;--mute:#667085;--line:#e4e7ec;--acc:#2f6fed;--ins:#d9f7e3;--del:#fde2e1;}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#14213d;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+header h1{font-size:19px;margin:0}header .tag{font-size:12px;background:#ffffff22;padding:3px 9px;border-radius:12px}
+nav{display:flex;gap:4px;margin-left:auto}nav button{background:none;border:0;color:#cfd8ea;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px}
+nav button.on{background:#ffffff1f;color:#fff}
+main{max-width:1280px;margin:20px auto;padding:0 18px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+textarea{width:100%;min-height:220px;border:1px solid var(--line);border-radius:8px;padding:12px;font:15px/1.55 Georgia,serif;resize:vertical}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.row label{font-size:13px;color:var(--mute)}
+select,input[type=text],input[type=number],input[type=password]{border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:14px}
+button.b{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer}button.b:disabled{opacity:.5}
+button.g{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:900px){.two{grid-template-columns:1fr}}
+.pane{border:1px solid var(--line);border-radius:8px;padding:12px;min-height:160px;white-space:pre-wrap;font:15px/1.6 Georgia,serif;background:#fcfcfd}
+.pane h4{margin:0 0 6px;font:600 13px system-ui;color:var(--mute)}ins{background:var(--ins);text-decoration:none}del{background:var(--del);text-decoration:line-through;color:#9b1c1c}
+.bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .3s}
+.mute{color:var(--mute);font-size:13px}.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;background:#eef2ff;margin:2px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.stat{border:1px solid var(--line);border-radius:8px;padding:8px}.stat b{display:block;font-size:20px}
+mark{border-radius:3px;cursor:pointer;padding:0 1px}mark.ai_stock{background:#ffe2b8}mark.wordy{background:#fff1a8}mark.filler{background:#f5e1ff}mark.cliche{background:#ffd6e7}
+mark.repetition{background:#d6ecff}mark.rhythm{background:#e0f2e9;border-bottom:2px solid #3a9b6a}mark.passive{background:#e5e7ff}mark.long{background:#ffe8e0}mark.structure{background:#e9e9e9}mark.style{background:#dff7f7}mark.custom{background:#f0ffd4}mark.flow{background:#e8dcff}mark.conclusion{background:#ffd9b3}mark.citation{background:#c9f0ff;border-bottom:2px dotted #0a7ea4}
+.mt{width:auto;border-collapse:collapse;margin-top:8px}.mt td,.mt th{padding:4px 12px}.up{color:#067647;font-weight:600}.down{color:#b42318;font-weight:600}
+.help{font-size:13px;color:var(--mute);margin:4px 0 0}
+.issue{border-left:4px solid var(--acc);padding:6px 10px;margin:6px 0;background:#fafbff;border-radius:4px;font-size:14px}.issue small{color:var(--mute)}
+.tip{position:fixed;max-width:360px;background:#1d2433;color:#fff;font-size:13px;padding:10px 12px;border-radius:8px;z-index:9;display:none;box-shadow:0 6px 24px #0004}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{border-bottom:1px solid var(--line);padding:6px;text-align:left;vertical-align:top}
+.note{font-size:12px;color:var(--mute);margin-top:8px}.err{color:#b42318}
+dialog{border:1px solid var(--line);border-radius:12px;width:min(700px,95vw)}dialog textarea{min-height:240px;font:13px/1.4 Consolas,monospace}
+</style>
+</head>
+<body>
+<header><h1>Writing Assistant</h1><span class="tag">Editing aid: clarity, flow and style</span>
+<nav><button data-t="rewrite" class="on">Rewrite</button><button data-t="feedback">Feedback</button><button data-t="rules">Style rules</button><button data-t="settings">Settings</button></nav></header>
+<main>
+<!-- REWRITE -->
+<section id="t-rewrite">
+ <div class="card">
+  <div class="row" style="justify-content:space-between"><b>Your text</b><span class="row"><input type="file" id="rw-file" accept=".docx,.pdf,.txt,.md"><span class="mute" id="rw-count"></span></span></div>
+  <textarea id="rw-in" placeholder="Paste text here, or upload a DOCX, PDF or TXT file..."></textarea>
+  <div class="row" style="margin-top:10px">
+   <label>Tone <select id="rw-tone"><option value="academic">Academic</option><option value="formal">Formal</option><option value="friendly">Friendly</option><option value="simple">Simple</option></select></label>
+   <label>Strength <select id="rw-strength"><option value="light">Light edit</option><option value="full">Full rewrite</option></select></label>
+   <label><input type="checkbox" id="rw-brit" checked> Keep British English</label>
+   <label title="Swap complex words for plain ones (editable list under Style rules) and split very long sentences where safe"><input type="checkbox" id="rw-plain" checked> Plain-words pass</label>
+   <label title="If a rewrite comes out harder to read than your original, retry (up to 2 times) with plainer wording and keep the most readable version"><input type="checkbox" id="rw-rcheck" checked> Readability check</label>
+   <button class="b" id="rw-go">Rewrite</button><span class="mute" id="rw-backend"></span>
+  </div>
+  <div class="bar"><i id="rw-bar"></i></div><div class="mute" id="rw-msg"></div>
+ </div>
+ <div class="card" id="rw-out" style="display:none">
+  <div class="row" style="justify-content:space-between"><b>Side-by-side changes</b>
+   <span class="row"><button class="g" id="rw-copy">Copy result</button><button class="g" id="rw-docx">Download .docx</button><button class="g" id="rw-fb">Get feedback on result</button><button class="g" id="rw-again">Rewrite again</button></span></div>
+  <div class="two" style="margin-top:10px"><div class="pane"><h4>ORIGINAL</h4><div id="rw-left"></div></div><div class="pane"><h4>REWRITTEN (editable below)</h4><div id="rw-right"></div></div></div>
+  <div id="rw-metrics"></div>
+  <textarea id="rw-result" style="min-height:140px;margin-top:10px"></textarea>
+  <div class="note" id="rw-meta"></div>
+  <div class="note">Quotes, citations, URLs and numbers are locked and checked after every rewrite. Always read the result: the model can still change a nuance.</div>
+ </div>
+</section>
+<!-- FEEDBACK -->
+<section id="t-feedback" style="display:none">
+ <div class="card"><div class="row" style="justify-content:space-between"><b>Text to review</b><input type="file" id="fb-file" accept=".docx,.pdf,.txt,.md"></div>
+  <textarea id="fb-in" placeholder="Paste text to get style feedback..."></textarea>
+  <div class="row" style="margin-top:10px"><label>Citation style <select id="fb-cite"><option value="auto">Auto-detect</option><option value="apa">APA 7</option><option value="harvard">Harvard</option><option value="off">Don't check</option></select></label><button class="b" id="fb-go">Analyse</button><span class="mute">Hover or tap a highlight for the explanation and fix.</span></div></div>
+ <div id="fb-out" style="display:none">
+  <div class="card"><div class="stats" id="fb-stats"></div><ul id="fb-summary"></ul><div id="fb-legend"></div></div>
+  <div class="two"><div class="card"><b>Highlighted text</b><div class="pane" id="fb-text" style="margin-top:8px"></div></div>
+  <div class="card"><b>Issues</b> <select id="fb-filter"><option value="">All categories</option></select><div id="fb-list" style="max-height:640px;overflow:auto"></div></div></div>
+ </div>
+</section>
+<!-- RULES -->
+<section id="t-rules" style="display:none">
+ <div class="card"><div class="row" style="justify-content:space-between"><b>Style rules</b>
+  <span class="row"><button class="b" id="ru-add">Add rule</button><button class="g" id="ru-export">Export JSON</button>
+  <label class="g" style="cursor:pointer">Import JSON<input type="file" id="ru-import" accept=".json" hidden></label>
+  <select id="ru-imode"><option value="merge">Import: merge</option><option value="replace">Import: replace all</option></select>
+  <button class="g" id="ru-reset">Restore defaults</button></span></div>
+  <p class="mute">Rules shape both the rewrite and the feedback. Types: <b>replace</b> (phrase → one of several alternatives, picked at random), <b>ban</b> (words to avoid), <b>sentence_length</b> (length and variety targets), <b>contractions</b>, <b>tone</b> (instructions to the rewrite model) and <b>check</b> (your own regex feedback check). Saved in <code id="ru-path"></code>.</p>
+  <div class="row"><input type="text" id="ru-search" placeholder="Search rules..." style="flex:1"><select id="ru-ftype"><option value="">All types</option></select></div>
+  <table style="margin-top:8px"><thead><tr><th>On</th><th>Name</th><th>Type</th><th>Applies to</th><th>Details</th><th></th></tr></thead><tbody id="ru-body"></tbody></table></div>
+ <div class="card"><div class="row" style="justify-content:space-between"><b>Plain words</b> <span class="row"><button class="g" id="pw-save">Save list</button><button class="g" id="pw-reset">Restore defaults</button></span></div>
+  <p class="mute">Used by the "Plain-words pass" after each rewrite: every word on the left is swapped for the plain word on the right (whole words, any capitalisation). One entry per line as <code>complex = plain</code>. List each form you want (utilise, utilised, utilising). Saved in <code id="pw-path"></code>.</p>
+  <textarea id="pw-text" style="min-height:160px;font:13px/1.4 Consolas,monospace"></textarea><div class="mute" id="pw-msg"></div></div>
+ <div class="card"><b>Try the replace rules</b> <span class="mute">(instant, no model)</span>
+  <textarea id="ru-try" style="min-height:90px">In today's fast-paced world, it is important to note that students utilize tools in order to learn. Moreover, this plays a crucial role in education.</textarea>
+  <div class="row"><button class="g" id="ru-try-go">Preview</button></div><div class="pane" id="ru-try-out" style="min-height:60px;margin-top:8px"></div></div>
+</section>
+<!-- SETTINGS -->
+<section id="t-settings" style="display:none">
+ <div class="card"><b>Local model (offline, free)</b>
+  <div class="row" style="margin-top:8px"><select id="st-local"></select></div>
+  <p class="mute">Downloaded once on first use, then works without internet. The 1.5B model writes better; the 0.5B model is about 2-3× faster on slower PCs.</p></div>
+ <div class="card"><b>Optional: online model (higher quality)</b>
+  <p class="mute">Any OpenAI-compatible service: OpenAI <code>https://api.openai.com/v1</code>, xAI Grok <code>https://api.x.ai/v1</code>, Groq <code>https://api.groq.com/openai/v1</code>, or a local server such as Ollama <code>http://localhost:11434/v1</code>. Your text is sent to that service. If it fails, the local model is used.</p>
+  <div class="row"><label>Preset <select id="st-preset"><option value="">Custom</option></select></label><a id="st-keylink" target="_blank" class="mute"></a></div>
+  <div class="mute" id="st-env" style="margin:6px 0"></div>
+  <div class="row"><label><input type="checkbox" id="st-use"> Use online model</label></div>
+  <div class="row" style="margin-top:8px"><label>Base URL <input type="text" id="st-base" size="36"></label><label>Model <input type="text" id="st-model" size="22"></label><label>API key <input type="password" id="st-key" size="28"></label></div>
+  <div class="row" style="margin-top:10px"><button class="b" id="st-save">Save</button><button class="g" id="st-test">Test connection</button><span id="st-msg" class="mute"></span></div></div>
+ <div class="card mute">This app is an editing aid for clarity, tone and style. It does not score text for AI detection and has no detector-evasion features. If your institution requires you to disclose AI or editing-tool use, do so.</div>
+</section>
+</main>
+<div class="tip" id="tip"></div>
+<dialog id="dlg"><form method="dialog"><b>Edit rule</b><p class="mute" id="dlg-help"></p>
+ <div class="row"><label>Type <select id="dlg-type"></select></label><button class="g" type="button" id="dlg-tpl">Load example for this type</button></div>
+ <textarea id="dlg-json"></textarea><div class="err" id="dlg-err"></div>
+ <div class="row" style="margin-top:8px;justify-content:flex-end"><button class="g" value="cancel">Cancel</button><button class="b" id="dlg-save" value="default">Save rule</button></div></form></dialog>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function api(path,opt={}){const r=await fetch(path,opt);const ct=r.headers.get('content-type')||'';const d=ct.includes('json')?await r.json():await r.text();if(!r.ok)throw new Error(d.detail||d.error||r.statusText);return d}
+const post=(p,b)=>api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+function show(t){if(!['rewrite','feedback','rules','settings'].includes(t))t='rewrite';document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t==t));['rewrite','feedback','rules','settings'].forEach(x=>$('#t-'+x).style.display=x==t?'':'none');if(t=='rules')loadRules();if(t=='settings')loadSettings()}
+async function upload(input,target){const f=input.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);try{const d=await api('/api/extract',{method:'POST',body:fd});$(target).value=d.text;count()}catch(e){alert(e.message)}}
+$('#rw-file').onchange=e=>upload(e.target,'#rw-in');$('#fb-file').onchange=e=>upload(e.target,'#fb-in');
+function count(){const n=($('#rw-in').value.match(/\S+/g)||[]).length;$('#rw-count').textContent=n+' words'}$('#rw-in').oninput=count;
+function renderDiff(ops){return ops.map(([k,t])=>k=='eq'?esc(t):k=='ins'?'<ins>'+esc(t)+'</ins>':'<del>'+esc(t)+'</del>').join('')}
+async function doRewrite(text){$('#rw-go').disabled=true;$('#rw-msg').textContent='Starting... (the first run loads the model, which can take a minute)';$('#rw-bar').style.width='2%';
+ try{const {job_id}=await post('/api/rewrite',{text,tone:$('#rw-tone').value,strength:$('#rw-strength').value,british:$('#rw-brit').checked,plain_words:$('#rw-plain').checked,readability_check:$('#rw-rcheck').checked});
+ for(;;){await new Promise(r=>setTimeout(r,1200));const j=await api('/api/jobs/'+job_id);$('#rw-bar').style.width=Math.max(2,j.progress*100)+'%';$('#rw-msg').textContent=j.message;
+  if(j.status=='error')throw new Error(j.message);if(j.status=='done'){showResult(j.result);break}}}
+ catch(e){$('#rw-msg').innerHTML='<span class="err">'+esc(e.message)+'</span>'}finally{$('#rw-go').disabled=false}}
+function metricsTable(rb){if(!rb)return'';const rows=[['Reading ease (higher = easier)','flesch_reading_ease',1],['Grade level (lower = easier)','flesch_kincaid_grade',-1],['Fog index (lower = easier)','gunning_fog',-1],['Average sentence (words)','avg_sentence_words',-1],['Longest sentence (words)','longest_sentence',-1],['Sentence-length variation','sentence_length_variation',1],['Words','words',0]];
+ return `<table class="mt"><tr><th>Readability</th><th>Before</th><th>After</th><th></th></tr>`+rows.map(([l,k,dir])=>{const a=rb.before[k],b=rb.after[k];const d=Math.round((b-a)*10)/10;const cls=dir==0||d==0?'':((d>0)==(dir>0)?'up':'down');return `<tr><td>${l}</td><td>${a}</td><td>${b}</td><td class="${cls}">${d>0?'+':''}${d}</td></tr>`}).join('')+`</table><div class="note">${rb.before.reading_ease_label} → ${rb.after.reading_ease_label}${rb.retries?` · ${rb.retries} plain-language retr${rb.retries==1?'y':'ies'} after a harder-to-read draft`:''}</div>`}
+function showResult(r){$('#rw-metrics').innerHTML=metricsTable(r.readability);$('#rw-out').style.display='';$('#rw-left').innerHTML=renderDiff(r.diff.left);$('#rw-right').innerHTML=renderDiff(r.diff.right);$('#rw-result').value=r.text;
+ $('#rw-meta').textContent=`Engine: ${r.backends.join(', ')||'none'} (${r.model}) · ${r.chunks} part(s) · ${r.seconds}s · ${r.diff.words_changed} words changed · ${r.rule_changes.length} style-rule edits`+(r.notes.length?' · Notes: '+r.notes.join('; '):'');$('#rw-backend').textContent=''}
+$('#rw-go').onclick=()=>{const t=$('#rw-in').value.trim();if(!t)return alert('Paste or upload some text first');doRewrite(t)};
+$('#rw-again').onclick=()=>doRewrite($('#rw-in').value.trim());
+$('#rw-copy').onclick=()=>{navigator.clipboard.writeText($('#rw-result').value);$('#rw-copy').textContent='Copied'};
+$('#rw-docx').onclick=async()=>{const r=await fetch('/api/export/docx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('#rw-result').value})});const b=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='edited.docx';a.click()};
+$('#rw-fb').onclick=()=>{$('#fb-in').value=$('#rw-result').value;show('feedback');runFeedback()};
+// FEEDBACK
+let FB=null;
+async function runFeedback(){const t=$('#fb-in').value.trim();if(!t)return;try{FB=await post('/api/feedback',{text:t,citation_style:$('#fb-cite').value});renderFeedback()}catch(e){alert(e.message)}}
+$('#fb-go').onclick=runFeedback;$('#fb-filter').onchange=renderFeedback;
+function renderFeedback(){const d=FB,s=d.stats;$('#fb-out').style.display='';
+ const st=[['Words',s.words],['Sentences',s.sentences],['Reading ease',s.flesch_reading_ease+' · '+s.reading_ease_label],['Grade level',s.flesch_kincaid_grade],['Fog index',s.gunning_fog],['Avg sentence',s.avg_sentence_words+' words'],['Length variation',s.sentence_length_variation],['Lexical variety',s.lexical_variety]];
+ $('#fb-stats').innerHTML=st.map(([k,v])=>`<div class="stat"><span class="mute">${k}</span><b>${esc(v)}</b></div>`).join('');
+ $('#fb-summary').innerHTML=d.summary.map(x=>'<li>'+esc(x)+'</li>').join('')+'<li class="mute">'+esc(d.note)+'</li>';
+ const sel=$('#fb-filter'),cur=sel.value;sel.innerHTML='<option value="">All categories</option>'+Object.entries(d.counts).map(([k,n])=>`<option value="${k}">${esc(d.categories[k]||k)} (${n})</option>`).join('');sel.value=cur;
+ $('#fb-legend').innerHTML=Object.keys(d.counts).map(k=>`<mark class="${k}">${esc(d.categories[k]||k)}</mark> `).join('')+Object.keys(d.counts).filter(k=>d.category_help&&d.category_help[k]).map(k=>`<p class="help"><b>${esc(d.categories[k])}:</b> ${esc(d.category_help[k])}</p>`).join('');
+ const iss=d.issues.filter(i=>!sel.value||i.category==sel.value);
+ // inline highlight: short spans only (<=120 chars), non-overlapping
+ const spans=iss.filter(i=>i.end-i.start<=120).sort((a,b)=>a.start-b.start);let html='',pos=0;
+ spans.forEach((i)=>{if(i.start<pos)return;html+=esc(d.text.slice(pos,i.start))+`<mark class="${i.category}" data-i="${d.issues.indexOf(i)}">${esc(d.text.slice(i.start,i.end))}</mark>`;pos=i.end});html+=esc(d.text.slice(pos));$('#fb-text').innerHTML=html;
+ $('#fb-list').innerHTML=iss.map(i=>{const n=d.issues.indexOf(i);const reps=(i.replacements||[]).map((r,k)=>`<button class="g" data-fix="${n}" data-k="${k}">${r?esc(r):'delete'}</button>`).join(' ');
+  return `<div class="issue"><b>${esc(i.title)}</b> <span class="pill">${esc(i.category_label)}</span><br>${esc(i.message)}<br><small>${esc(i.suggestion)}</small> <small class="mute">"${esc(d.text.slice(i.start,Math.min(i.end,i.start+90)))}${i.end-i.start>90?'…':''}"</small>${reps?'<div class="row" style="margin-top:4px">Fix: '+reps+'</div>':''}</div>`}).join('')||'<p class="mute">No issues in this category.</p>';
+ document.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>applyFix(+b.dataset.fix,+b.dataset.k));
+ document.querySelectorAll('#fb-text mark').forEach(m=>{m.onmouseenter=m.onclick=e=>{const i=d.issues[+m.dataset.i];const t=$('#tip');t.innerHTML=`<b>${esc(i.title)}</b><br>${esc(i.message)}<br><i>${esc(i.suggestion)}</i>`;t.style.display='block';t.style.left=Math.min(e.clientX+12,innerWidth-380)+'px';t.style.top=(e.clientY+14)+'px'};m.onmouseleave=()=>$('#tip').style.display='none'})}
+function applyFix(n,k){const i=FB.issues[n],r=i.replacements[k];let t=FB.text.slice(0,i.start)+r+FB.text.slice(i.end);t=t.replace(/ {2,}/g,' ').replace(/ ([,.;:])/g,'$1').replace(/(^|[.!?]\s+)([a-z])/g,(m,a,b)=>a+b.toUpperCase());$('#fb-in').value=t;runFeedback()}
+// RULES
+let RULES=[],EDIT=null;
+const TPL={replace:{name:'my phrase',type:'replace',pattern:'a lot of',regex:false,whole_word:true,case_sensitive:false,alternatives:['many','plenty of'],category:'wordy',message:'Informal; try a more precise word.',applies_to:['rewrite','feedback'],enabled:true},
+ ban:{name:'Words I never want',type:'ban',phrases:['synergy','paradigm'],action:'flag',message:'Jargon. Use plain words.',category:'custom',applies_to:['rewrite','feedback'],enabled:true},
+ sentence_length:{name:'Sentence length and variety',type:'sentence_length',warn_words:30,max_words:40,min_variation:0.35,target_min:6,target_max:28,category:'rhythm',applies_to:['rewrite','feedback'],enabled:true},
+ contractions:{name:'Contractions',type:'contractions',mode:'use',applies_to:['rewrite','feedback'],enabled:true},
+ tone:{name:'My voice',type:'tone',tones:['friendly'],instruction:'Address the reader as "you" and use everyday examples already present in the text.',applies_to:['rewrite'],enabled:true},
+ check:{name:'Starts with "This"',type:'check',pattern:'(?:^|[.!?]\\s+)This (?:is|shows)\\b',min_count:1,message:'Vague "This" opener.',suggestion:'Name what "this" refers to.',category:'custom',applies_to:['feedback'],enabled:true}};
+async function loadPlain(){const d=await api('/api/plainwords');$('#pw-path').textContent=d.path;$('#pw-text').value=Object.entries(d.words).map(([k,v])=>k+' = '+v).join('\n');$('#pw-msg').textContent=Object.keys(d.words).length+' entries'}
+$('#pw-save').onclick=async()=>{const w={};for(const line of $('#pw-text').value.split('\n')){const i=line.indexOf('=');if(i>0){const k=line.slice(0,i).trim(),v=line.slice(i+1).trim();if(k)w[k]=v}}try{await api('/api/plainwords',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({words:w})});await loadPlain();$('#pw-msg').textContent+=' · saved'}catch(e){$('#pw-msg').textContent=e.message}};
+$('#pw-reset').onclick=async()=>{if(confirm('Restore the default plain-words list?')){await post('/api/plainwords/reset',{});loadPlain()}};
+async function loadRules(){loadPlain();const d=await api('/api/rules');RULES=d.rules;$('#ru-path').textContent=d.path;const ft=$('#ru-ftype');if(ft.options.length<2)d.types.forEach(t=>ft.add(new Option(t,t)));if(!$('#dlg-type').options.length)d.types.forEach(t=>$('#dlg-type').add(new Option(t,t)));drawRules()}
+function detail(r){switch(r.type){case'replace':return `${esc(r.pattern)}${r.regex?' <span class=pill>regex</span>':''} → ${r.alternatives.map(a=>a?esc(a):'<i>delete</i>').join(' | ')}`;case'ban':return esc(r.phrases.join(', '))+' ('+(r.action||'flag')+')';case'sentence_length':return `warn &gt; ${r.warn_words}, max ${r.max_words}, variation ≥ ${r.min_variation}`;case'contractions':return 'mode: '+esc(r.mode);case'tone':return (r.tones&&r.tones.length?'['+r.tones.join(', ')+'] ':'[all tones] ')+esc(r.instruction);case'check':return '/'+esc(r.pattern)+'/ · '+esc(r.message||'')}}
+function drawRules(){const q=$('#ru-search').value.toLowerCase(),ft=$('#ru-ftype').value;
+ $('#ru-body').innerHTML=RULES.filter(r=>(!ft||r.type==ft)&&(!q||JSON.stringify(r).toLowerCase().includes(q))).map(r=>`<tr><td><input type="checkbox" data-tog="${esc(r.id)}" ${r.enabled?'checked':''}></td><td><b>${esc(r.name)}</b><br><span class="mute">${esc(r.id)}</span></td><td>${r.type}</td><td>${(r.applies_to||[]).join(', ')}</td><td>${detail(r)}</td><td><button class="g" data-ed="${esc(r.id)}">Edit</button> <button class="g" data-del="${esc(r.id)}">Delete</button></td></tr>`).join('');
+ document.querySelectorAll('[data-tog]').forEach(c=>c.onchange=async()=>{await post('/api/rules/'+encodeURIComponent(c.dataset.tog)+'/toggle',{enabled:c.checked});loadRules()});
+ document.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>openRule(RULES.find(r=>r.id==b.dataset.ed)));
+ document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(confirm('Delete this rule?')){await api('/api/rules/'+encodeURIComponent(b.dataset.del),{method:'DELETE'});loadRules()}})}
+$('#ru-search').oninput=drawRules;$('#ru-ftype').onchange=drawRules;
+function openRule(r){EDIT=r;const x=r?JSON.parse(JSON.stringify(r)):TPL.replace;$('#dlg-type').value=x.type;$('#dlg-json').value=JSON.stringify(x,null,2);$('#dlg-err').textContent='';$('#dlg-help').textContent='Edit the rule as JSON. "applies_to" can be ["rewrite"], ["feedback"] or both. See README → Writing style rules.';$('#dlg').showModal()}
+$('#ru-add').onclick=()=>openRule(null);$('#dlg-tpl').onclick=()=>{const t=JSON.parse(JSON.stringify(TPL[$('#dlg-type').value]));try{const cur=JSON.parse($('#dlg-json').value);if(cur.id)t.id=cur.id}catch(e){}$('#dlg-json').value=JSON.stringify(t,null,2)};
+$('#dlg-save').onclick=async e=>{e.preventDefault();try{const r=JSON.parse($('#dlg-json').value);await post('/api/rules',r);$('#dlg').close();loadRules()}catch(err){$('#dlg-err').textContent=err.message}};
+$('#ru-export').onclick=()=>location.href='/api/rules/export';
+$('#ru-import').onchange=async e=>{const fd=new FormData();fd.append('file',e.target.files[0]);try{const d=await api('/api/rules/import?mode='+$('#ru-imode').value,{method:'POST',body:fd});alert('Imported. '+d.count+' rules now.');loadRules()}catch(err){alert(err.message)}e.target.value=''};
+$('#ru-reset').onclick=async()=>{if(confirm('Replace all rules with the defaults?')){await post('/api/rules/reset',{});loadRules()}};
+$('#ru-try-go').onclick=async()=>{const d=await post('/api/rules/test',{text:$('#ru-try').value});$('#ru-try-out').innerHTML=renderDiff((await post('/api/diff',{a:$('#ru-try').value,b:d.text})).right)};
+// SETTINGS
+let PRESETS={};
+async function loadSettings(){const s=await api('/api/settings');PRESETS=s.presets||{};const ps=$('#st-preset');if(ps.options.length<2)Object.entries(PRESETS).forEach(([k,p])=>ps.add(new Option(p.label,k)));
+ ps.value=Object.keys(PRESETS).find(k=>PRESETS[k].api_base==s.api_base)||'';showKeyLink();
+ $('#st-env').textContent=s.key_source=='GROQ_API_KEY'?'Using the GROQ_API_KEY environment variable from this PC (Groq preset).':(s.groq_env?'A GROQ_API_KEY environment variable is set; it is used when no key is saved here.':'');const sel=$('#st-local');sel.innerHTML=Object.entries(s.local_models).map(([k,v])=>`<option value="${k}">${k} — ${v}</option>`).join('');sel.value=s.local_model;$('#st-use').checked=s.use_api;$('#st-base').value=s.api_base;$('#st-model').value=s.api_model;$('#st-key').value=s.api_key}
+function showKeyLink(){const p=PRESETS[$('#st-preset').value];const a=$('#st-keylink');if(p){a.href=p.key_url;a.textContent='Get a '+p.label.split(' (')[0]+' key';}else{a.textContent=''}}
+$('#st-preset').onchange=()=>{const p=PRESETS[$('#st-preset').value];if(p){$('#st-base').value=p.api_base;$('#st-model').value=p.api_model;$('#st-use').checked=true}showKeyLink()};
+$('#st-save').onclick=async()=>{await post('/api/settings',{preset:$('#st-preset').value||null,local_model:$('#st-local').value,use_api:$('#st-use').checked,api_base:$('#st-base').value,api_model:$('#st-model').value,api_key:$('#st-key').value});$('#st-msg').textContent='Saved.'};
+$('#st-test').onclick=async()=>{$('#st-msg').textContent='Testing...';try{const d=await post('/api/settings/test',{});$('#st-msg').textContent='Connected: "'+d.reply+'" in '+d.seconds+'s'}catch(e){$('#st-msg').textContent='Failed: '+e.message}};
+if(location.hash)show(location.hash.slice(1));
+</script>
+</body></html>

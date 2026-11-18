@@ -1,0 +1,61 @@
+=== academic/light  20.4s  engines=['local', 'rules']  plain-retries=0
+   flesch_reading_ease: 31.8 -> 50.7
+   flesch_kincaid_grade: 12.1 -> 8.7
+   gunning_fog: 13.0 -> 8.0
+   avg_sentence_words: 13.2 -> 10.2
+   longest_sentence: 20 -> 17
+   sentence_length_variation: 0.26 -> 0.3
+   feedback flags after: {'rhythm': 1, 'repetition': 10, 'citation': 1}
+Technology is vital in higher education. Students use many digital tools to improve their learning. Lecturers use online platforms to help them learn together. Technology also needs strong digital literacy skills. A 2022 survey of 1,200 students at Chinhoyi University of Technology found that 68% used e-learning platforms weekly (Moyo, 2023).
+
+Mobile learning is a big step forward for rural students. It gives them access to learning materials they could not get before. It lets them learn at their own speed. And it helps teachers teach more people outside the classroom. As Banda et al. (2021) note, "connectivity remains the single biggest barrier to equitable access." To sum up, technology shows how innovation can change education.
+   notes: ['Sentences with a direct quotation or several figures were kept as written (style rules and plain words only), so quotes and statistics stay exact.']
+=== academic/full  34.5s  engines=['local', 'rules']  plain-retries=1
+   flesch_reading_ease: 31.8 -> 48.7
+   flesch_kincaid_grade: 12.1 -> 8.7
+   gunning_fog: 13.0 -> 7.6
+   avg_sentence_words: 13.2 -> 9.1
+   longest_sentence: 20 -> 17
+   sentence_length_variation: 0.26 -> 0.36
+   feedback flags after: {'rhythm': 1, 'repetition': 16, 'citation': 1}
+Technology is vital in higher education. Students use many digital tools to learn better. Teachers use online places to help everyone work together. Technology also means people need good technology skills. A 2022 survey of 1,200 students at Chinhoyi University of Technology found that 68% used e-learning platforms weekly (Moyo, 2023).
+
+Mobile learning is a major shift for rural students. It brings learning resources they could not get before. It lets them learn at their own time. It helps teachers touch everyone. As Banda et al. (2021) note, "connectivity remains the single biggest barrier to equitable access." Technology shows how innovation can change education.
+   notes: ['Sentences with a direct quotation or several figures were kept as written (style rules and plain words only), so quotes and statistics stay exact.', 'Rewrite was harder to read (reading ease -2.2 vs 15.4, avg sentence 8 vs 17 words); retried with plainer wording', 'Rewrite was harder to read (reading ease 6.4 vs 15.4, avg sentence 7 vs 17 words); retried with plainer wording', 'local output rejected (length changed too much (0.41x)); retrying']
+=== formal/full  56.8s  engines=['local', 'rules']  plain-retries=1
+   flesch_reading_ease: 31.8 -> 51.6
+   flesch_kincaid_grade: 12.1 -> 8.4
+   gunning_fog: 13.0 -> 7.2
+   avg_sentence_words: 13.2 -> 9.5
+   longest_sentence: 20 -> 17
+   sentence_length_variation: 0.26 -> 0.32
+   feedback flags after: {'rhythm': 3, 'repetition': 16, 'citation': 1}
+Technology is vital in higher education. Students use many digital tools to learn better. Teachers use online places to help everyone work together. Technology also means people need good technology skills. A 2022 survey of 1,200 students at Chinhoyi University of Technology found that 68% used e-learning platforms weekly (Moyo, 2023).
+
+Mobile learning is a major shift for rural students. It brings learning resources they could not get before. It lets them learn at their own time. It helps teachers teach to places outside the school. As Banda et al. (2021) note, "connectivity remains the single biggest barrier to equitable access." Technology shows how innovation can change education.
+   notes: ['Sentences with a direct quotation or several figures were kept as written (style rules and plain words only), so quotes and statistics stay exact.', 'Rewrite was harder to read (reading ease -2.2 vs 15.4, avg sentence 8 vs 17 words); retried with plainer wording', 'Rewrite was harder to read (reading ease 6.4 vs 15.4, avg sentence 7 vs 17 words); retried with plainer wording', 'local output rejected (length changed too much (0.41x)); retrying']
+=== friendly/full  18.3s  engines=['local', 'rules']  plain-retries=0
+   flesch_reading_ease: 31.8 -> 57.2
+   flesch_kincaid_grade: 12.1 -> 8.1
+   gunning_fog: 13.0 -> 8.5
+   avg_sentence_words: 13.2 -> 11.4
+   longest_sentence: 20 -> 17
+   sentence_length_variation: 0.26 -> 0.28
+   feedback flags after: {'rhythm': 2, 'style': 5, 'citation': 1}
+Technology is key in higher ed. Students use lots of digital stuff to learn better. Teachers use online places to help everyone work together. And tech needs good digital skills. A 2022 survey of 1,200 students at Chinhoyi University of Technology found that 68% used e-learning platforms weekly (Moyo, 2023).
+
+Mobile learning is a big help for children in places far away. It lets them learn new stuff without leaving home. It also helps teachers teach everyone, not just in school buildings. As Banda et al. (2021) note, "connectivity remains the single biggest barrier to equitable access." To sum up, technology shows how innovation can change education.
+   notes: ['Sentences with a direct quotation or several figures were kept as written (style rules and plain words only), so quotes and statistics stay exact.']
+=== simple/full  14.2s  engines=['local', 'rules']  plain-retries=0
+   flesch_reading_ease: 31.8 -> 62.3
+   flesch_kincaid_grade: 12.1 -> 7.4
+   gunning_fog: 13.0 -> 7.3
+   avg_sentence_words: 13.2 -> 11.2
+   longest_sentence: 20 -> 17
+   sentence_length_variation: 0.26 -> 0.3
+   feedback flags after: {'rhythm': 1, 'style': 4, 'repetition': 3, 'citation': 1}
+Technology is key in higher ed. Students use lots of digital stuff to learn better. Teachers use online places to help everyone work together. And it needs good digital skills. A 2022 survey of 1,200 students at Chinhoyi University of Technology found that 68% used e-learning platforms weekly (Moyo, 2023).
+
+Mobile learning is a big help for children in places far away. It lets them learn new stuff when they want to. And teachers can teach everyone, not just in school buildings. As Banda et al. (2021) note, "connectivity remains the single biggest barrier to equitable access." Technology shows how great ideas can change learning.
+   notes: ['Sentences with a direct quotation or several figures were kept as written (style rules and plain words only), so quotes and statistics stay exact.']
+ORIGINAL feedback flags: {'rhythm': 2, 'ai_stock': 16, 'repetition': 14, 'wordy': 3, 'structure': 4, 'citation': 1, 'flow': 1, 'cliche': 1}

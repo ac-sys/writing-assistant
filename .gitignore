@@ -1,0 +1,22 @@
+# Local runtime data & API keys
+data/
+*.env
+.env
+
+# Python virtual environments & cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local model weights
+*.gguf
+*.safetensors
+*.bin
+models/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,14 @@
+# Progress (v1.1 improvements)
+- started Wed Nov 18 10:10:34 CAT 2026
+- plain.py (plain words + long-sentence splitter) written
+- rewrite.py: few-shot prompts, per-tone temps, readability retry loop, plain pass wired; main.py options
+- citation repair + adult register tones
+- citations.py + flow/conclusion checks in feedback.py
+- config presets/GROQ env; main endpoints plainwords/readability/citation_style
+- UI: metrics table, plain/readability toggles, citation style, plain-words editor, presets
+- UI: metrics table, plain/readability toggles, citation style, plain-words editor, presets
+- tests/test_v11.py added; all passing
+- next: real-model e2e run (log /workspace/writing_assistant/samples/v11_run.txt)
+- register lines per tone, data-heavy sentence freeze, tone-scoped replace rules (informal words), harder() refinement
+- e2e v1.1 done: FRE 31.8 -> 48.7..62.3 (samples/v11_run.txt)
+- README updated; Groq default preset

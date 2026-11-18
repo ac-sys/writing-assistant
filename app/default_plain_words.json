@@ -1,0 +1,31 @@
+{
+  "_help": "Complex word -> plain word. Edit freely. Keys are matched as whole words, case-insensitive; list every form you want swapped (e.g. 'utilises' and 'utilised'). Set a value to null to disable an entry.",
+  "words": {
+    "utilise": "use", "utilises": "uses", "utilised": "used", "utilising": "using", "utilisation": "use",
+    "utilize": "use", "utilizes": "uses", "utilized": "used", "utilizing": "using", "utilization": "use",
+    "approximately": "about", "additional": "extra", "commence": "begin", "commences": "begins", "commenced": "began",
+    "terminate": "end", "terminated": "ended", "endeavour": "try", "endeavor": "try",
+    "facilitate": "help", "facilitates": "helps", "facilitated": "helped", "facilitating": "helping",
+    "enhance": "improve", "enhances": "improves", "enhanced": "improved", "enhancing": "improving",
+    "demonstrate": "show", "demonstrates": "shows", "demonstrated": "showed", "demonstrating": "showing",
+    "exemplify": "show", "exemplifies": "shows", "exemplified": "showed",
+    "necessitate": "require", "necessitates": "requires", "necessitated": "required",
+    "subsequently": "later", "prior to": "before", "in the event that": "if", "with regard to": "about",
+    "with respect to": "about", "in relation to": "about", "a majority of": "most", "the majority of": "most",
+    "numerous": "many", "a multitude of": "many", "a plethora of": "many", "a myriad of": "many",
+    "sufficient": "enough", "insufficient": "not enough", "obtain": "get", "obtained": "got", "obtains": "gets",
+    "purchase": "buy", "purchased": "bought", "assist": "help", "assists": "helps", "assisted": "helped",
+    "assistance": "help", "ascertain": "find out", "ameliorate": "improve", "endeavours": "efforts",
+    "methodology": "method", "functionality": "features", "modification": "change", "modifications": "changes",
+    "objective": "aim", "objectives": "aims", "optimal": "best", "paramount": "most important",
+    "pertaining to": "about", "regarding": "about", "remainder": "rest", "inception": "start",
+    "transformative": "far-reaching", "unprecedented": "new", "plethora": "wealth",
+    "commencement": "start", "ascertained": "found", "constitutes": "is", "constitute": "make up",
+    "the integration of": "bringing in", "in order to": "to", "due to the fact that": "because",
+    "at this point in time": "now", "in the near future": "soon", "a significant number of": "many",
+    "is able to": "can", "are able to": "can", "has the ability to": "can", "have the ability to": "can",
+    "leverage": "use", "leverages": "uses", "leveraged": "used", "leveraging": "using",
+    "educational domain": "education", "educational sphere": "education", "educational sector": "education",
+    "educational settings": "schools and universities"
+  }
+}

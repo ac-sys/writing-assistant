@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "rules": [
+    {"id": "a-lot-of", "name": "a lot of", "type": "replace", "enabled": true,
+     "applies_to": ["rewrite", "feedback"], "category": "wordy",
+     "pattern": "a lot of", "regex": false, "whole_word": true, "case_sensitive": false,
+     "alternatives": ["many", "plenty of", "a great deal of"],
+     "message": "Informal; pick a more precise quantity word."},
+    {"id": "regex-in-terms-of", "name": "in terms of", "type": "replace", "enabled": true,
+     "applies_to": ["rewrite", "feedback"], "category": "wordy",
+     "pattern": "in terms of (\\w+)", "regex": true, "whole_word": true,
+     "alternatives": ["for \\1", "regarding \\1"],
+     "message": "Vague linking phrase."},
+    {"id": "ban-jargon", "name": "Business jargon", "type": "ban", "enabled": true,
+     "applies_to": ["rewrite", "feedback"], "category": "custom", "action": "flag",
+     "phrases": ["synergy", "paradigm", "deep dive", "circle back"],
+     "message": "Jargon. Use plain words."},
+    {"id": "my-length", "name": "Shorter sentences", "type": "sentence_length", "enabled": true,
+     "applies_to": ["rewrite", "feedback"], "warn_words": 25, "max_words": 35,
+     "min_variation": 0.4, "target_min": 5, "target_max": 24},
+    {"id": "my-contractions", "name": "Contractions", "type": "contractions", "enabled": true,
+     "applies_to": ["rewrite", "feedback"], "mode": "use"},
+    {"id": "my-voice", "name": "Zimbabwean examples", "type": "tone", "enabled": true,
+     "applies_to": ["rewrite"], "tones": ["friendly", "simple"],
+     "instruction": "Keep any local names, places and examples exactly as they are."},
+    {"id": "check-this", "name": "Vague 'This' opener", "type": "check", "enabled": true,
+     "applies_to": ["feedback"], "category": "custom",
+     "pattern": "(?:^|[.!?]\\s+)This (?:is|shows|means)\\b", "min_count": 1,
+     "message": "'This' with no noun can be unclear.", "suggestion": "Say what 'this' is: 'This result shows...'"}
+  ]
+}
