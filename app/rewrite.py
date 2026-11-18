@@ -137,26 +137,85 @@ class LocalModel:
     _inst = None
     _lock = threading.Lock()
 
-    def __init__(self, name):
+    def __init__(self, name, quant="int8"):
+        self.name = name
+        self.quant = quant or "int8"
+        self.backend_type = "gguf" if name.lower().endswith("gguf") or name.lower().endswith(".gguf") else "transformers"
+        self._prefix_cache = {}
+        t = time.time()
+        if self.backend_type == "gguf":
+            self._init_gguf(name)
+        else:
+            self._init_transformers(name, self.quant)
+        log.info("loaded %s (%s) in %.1fs", name, self.quant, time.time() - t)
+
+    def _init_gguf(self, name):
+        try:
+            from llama_cpp import Llama
+        except ImportError as e:
+            raise RuntimeError("Install llama-cpp-python to run GGUF models, or pick a standard model in Settings.") from e
+        from huggingface_hub import hf_hub_download
+        if os.path.isfile(name):
+            model_path = name
+        else:
+            model_path = hf_hub_download(repo_id=name, filename="qwen2.5-1.5b-instruct-q4_k_m.gguf")
+        self.llm = Llama(model_path=model_path, n_ctx=2048, n_threads=max(1, (os.cpu_count() or 2)), verbose=False)
+
+    def _init_transformers(self, name, quant):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
         torch.set_num_threads(max(1, (os.cpu_count() or 2)))
-        self.name = name
-        t = time.time()
         self.tok = AutoTokenizer.from_pretrained(name)
-        self.model = AutoModelForCausalLM.from_pretrained(name, dtype=torch.float32)
+        dtype = torch.bfloat16 if quant in ("bfloat16", "int8") else torch.float32
+        try:
+            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype, low_cpu_mem_usage=True)
+        except Exception:
+            self.model = AutoModelForCausalLM.from_pretrained(name, dtype=torch.float32)
+        if quant == "int8":
+            try:
+                # Dynamic int8 quantization on linear layers for 2-3x faster CPU matrix multiplication
+                self.model = torch.ao.quantization.quantize_dynamic(
+                    self.model.to(torch.float32), {torch.nn.Linear}, dtype=torch.qint8
+                )
+            except Exception as e:
+                log.warning("int8 dynamic quantization skipped (%s), using %s", e, dtype)
         self.model.eval()
-        log.info("loaded %s in %.1fs", name, time.time() - t)
 
     @classmethod
-    def get(cls, name):
+    def get(cls, name, quant="int8"):
         with cls._lock:
-            if cls._inst is None or cls._inst.name != name:
+            if cls._inst is None or cls._inst.name != name or getattr(cls._inst, "quant", "int8") != (quant or "int8"):
                 cls._inst = None
-                cls._inst = LocalModel(name)
+                cls._inst = LocalModel(name, quant=quant)
             return cls._inst
 
+    def _get_prefix_kv(self, prefix_msgs):
+        """Cache the KV state for the static system + few-shot messages so multi-chunk documents
+        don't re-encode the ~350-token prompt prefix on every paragraph."""
+        import copy
+        import torch
+        key = tuple((m["role"], m["content"]) for m in prefix_msgs)
+        if key in self._prefix_cache:
+             cached_ids, cached_kv = self._prefix_cache[key]
+             return cached_ids, copy.deepcopy(cached_kv)
+        enc = self.tok.apply_chat_template(prefix_msgs, add_generation_prompt=False, return_tensors="pt", return_dict=True)
+        with torch.inference_mode():
+            out = self.model(**enc, use_cache=True)
+        if len(self._prefix_cache) > 8:
+            self._prefix_cache.clear()
+        self._prefix_cache[key] = (enc["input_ids"], out.past_key_values)
+        return enc["input_ids"], copy.deepcopy(out.past_key_values)
+
     def generate(self, messages, temperature, max_new_tokens, seed=None):
+        if self.backend_type == "gguf":
+            with LocalModel._lock:
+                res = self.llm.create_chat_completion(
+                    messages=messages,
+                    temperature=temperature if temperature > 0.05 else 0.0,
+                    max_tokens=max_new_tokens,
+                    seed=seed or -1,
+                )
+            return res["choices"][0]["message"]["content"]
         import torch
         if seed is not None:
             torch.manual_seed(seed)
@@ -167,6 +226,12 @@ class LocalModel:
         else:
             kw.update(do_sample=False)
         with LocalModel._lock, torch.inference_mode():
+            if len(messages) > 2:
+                try:
+                    _, past_kv = self._get_prefix_kv(messages[:-1])
+                    kw["past_key_values"] = past_kv
+                except Exception:
+                    pass
             out = self.model.generate(**enc, **kw)
         return self.tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
 
@@ -319,7 +384,8 @@ def rewrite_chunk(chunk, tone, strength, british, rules, settings, rng, seed=Non
         backends.append(("api", lambda m, t: api_generate(settings, m, t, max_new)))
     if not config.no_model():
         name = settings["local_model"]
-        backends.append(("local", lambda m, t: LocalModel.get(name).generate(m, t, max_new, seed)))
+        quant = settings.get("local_quant", "int8")
+        backends.append(("local", lambda m, t: LocalModel.get(name, quant=quant).generate(m, t, max_new, seed)))
     cands = []
     for backend, gen in backends:
         plain, tries, failed = None, 0, False
@@ -346,6 +412,15 @@ def rewrite_chunk(chunk, tone, strength, british, rules, settings, rng, seed=Non
             out_ph, changes = postprocess(out_ph, rules, tone, british, rng, plain_words)
             text = restore(out_ph, out_saved)
             m = metrics(text)
+            # Fast CPU post-pass: if the draft is still harder to read, try aggressive plain-words +
+            # sentence-splitting at a tighter 18-word threshold before spending another full LLM pass.
+            if readability_check and harder(m, base) and plain_words:
+                fast_ph, fast_ch = split_long_sentences(out_ph, max_words=18)
+                if fast_ch:
+                    fast_text = restore(fast_ph, out_saved)
+                    fast_m = metrics(fast_text)
+                    if not harder(fast_m, base):
+                        text, m, changes = fast_text, fast_m, changes + fast_ch
             cands.append({"text": text, "backend": backend, "changes": changes, "m": m, "try": tries,
                           "plain_retry": bool(plain)})
             if not readability_check or not harder(m, base):
@@ -389,24 +464,60 @@ def rewrite(text, tone="academic", strength="light", british=True, rules=None, p
     used, notes, changes = [], [], []
     retries = 0
     t0 = time.time()
-    for k, (i, c, frozen) in enumerate(plan):
-        if progress:
-            progress(k / max(1, len(plan)), f"Rewriting part {k + 1} of {len(plan)}")
+
+    def _run_one(k, i, c, frozen, chunk_rng):
         if not words(c) or (len(words(c)) < 4 and not c.rstrip().endswith((".", "!", "?"))):
-            out_paras[i].append(c)  # headings / tiny lines kept as they are
-            continue
+            return k, i, ChunkResult(text=c, backend=None, notes=[], rule_changes=[], readability_retries=0)
         if frozen:
             ph, saved = protect(c)
-            ph, ch = postprocess(ph, rules, tone, british, rng, plain_words)
-            res = ChunkResult(text=restore(ph, saved), backend="rules", notes=[], rule_changes=ch)
-            notes.append("Sentences with a direct quotation or several figures were kept as written (style rules and plain words only), so quotes and statistics stay exact.")
-        else:
-            res = rewrite_chunk(c, tone, strength, british, rules, settings, rng, seed, plain_words, readability_check)
+            ph, ch = postprocess(ph, rules, tone, british, chunk_rng, plain_words)
+            res = ChunkResult(text=restore(ph, saved), backend="rules",
+                              notes=["Sentences with a direct quotation or several figures were kept as written (style rules and plain words only), so quotes and statistics stay exact."],
+                              rule_changes=ch, readability_retries=0)
+            return k, i, res
+        res = rewrite_chunk(c, tone, strength, british, rules, settings, chunk_rng, seed, plain_words, readability_check)
+        return k, i, res
+
+    # Run online API chunks concurrently (up to 4 workers) for 3-4x faster multi-paragraph rewrites
+    use_parallel = bool(settings.get("use_api") and settings.get("api_key") and len(plan) > 1)
+    if use_parallel:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        chunk_rngs = [random.Random((seed or 0) + idx) for idx in range(len(plan))]
+        ordered = [None] * len(plan)
+        done_count = 0
+        with ThreadPoolExecutor(max_workers=min(4, len(plan))) as pool:
+            futs = {pool.submit(_run_one, k, i, c, fz, chunk_rngs[k]): k for k, (i, c, fz) in enumerate(plan)}
+            for fut in as_completed(futs):
+                k, i, res = fut.result()
+                ordered[k] = (i, res)
+                done_count += 1
+                if progress:
+                    partial_paras = [[] for _ in paras]
+                    for idx_done in range(len(plan)):
+                        if ordered[idx_done] is not None:
+                            p_i, p_res = ordered[idx_done]
+                            partial_paras[p_i].append(p_res["text"])
+                    partial_text = "\n\n".join(" ".join(p) for p in partial_paras if p)
+                    progress(done_count / max(1, len(plan)), f"Rewriting part {done_count} of {len(plan)}", partial=partial_text)
+        for i, res in ordered:
+            out_paras[i].append(res["text"])
+            if res["backend"]:
+                used.append(res["backend"])
+            notes += res["notes"]
+            changes += res["rule_changes"]
             retries += res.get("readability_retries", 0)
-        out_paras[i].append(res["text"])
-        used.append(res["backend"])
-        notes += res["notes"]
-        changes += res["rule_changes"]
+    else:
+        for k, (i, c, frozen) in enumerate(plan):
+            if progress:
+                partial_text = "\n\n".join(" ".join(p) for p in out_paras if p)
+                progress(k / max(1, len(plan)), f"Rewriting part {k + 1} of {len(plan)}", partial=partial_text)
+            _, i, res = _run_one(k, i, c, frozen, rng)
+            out_paras[i].append(res["text"])
+            if res["backend"]:
+                used.append(res["backend"])
+            notes += res["notes"]
+            changes += res["rule_changes"]
+            retries += res.get("readability_retries", 0)
     if progress:
         progress(1.0, "Done")
     result = "\n\n".join(" ".join(p) for p in out_paras)

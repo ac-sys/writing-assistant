@@ -61,12 +61,15 @@ editing tools.
   variation, lexical variety (MATTR), reading time.
 - Inline colour highlights. Hover for the explanation and fix, and click a fix button to apply it.
 
-## Local model
-Default: **Qwen2.5-1.5B-Instruct** (Apache-2.0, about 3 GB download, about 6-8 GB RAM). On an 8-core CPU,
-150 words take about 15-25 seconds. A faster **Qwen2.5-0.5B-Instruct** (about 1 GB) can be picked in Settings.
-Small local models are good at tidy-ups but weaker at deep rewrites: a "full rewrite" can blur a nuance or
-over-simplify in the friendly and simple tones. "Light edit" with the academic or formal tone is the safest
-local setting. For the best quality, use Groq (see below).
+## Local model & CPU Speedups
+Default: **Qwen2.5-0.5B-Instruct** with **Dynamic INT8 quantization** (Apache-2.0, ~1 GB download, ~1.5 GB RAM, 3–5× faster on CPU).
+In **Settings**, you can choose between:
+- `Qwen/Qwen2.5-0.5B-Instruct` — Ultra-Fast (0.5B, ~1 GB download)
+- `HuggingFaceTB/SmolLM2-360M-Instruct` — Featherweight (360M, ~700 MB download, instant CPU response)
+- `Qwen/Qwen2.5-1.5B-Instruct` — Quality (1.5B, ~3 GB download)
+- `Qwen/Qwen2.5-1.5B-Instruct-GGUF` — 4-bit GGUF (`Q4_K_M` via `llama-cpp-python` if installed)
+
+You can also pick the **CPU Quantization** mode (`Dynamic INT8`, `BFloat16`, or `Float32`). Furthermore, the engine caches the static system + few-shot prompt KV state across chunks, runs a fast sentence-splitting pass before triggering any LLM readability retries, streams live partial results via Server-Sent Events (`/api/jobs/{id}/stream`), runs online API chunks concurrently, and preserves `.docx` paragraph styles on export.
 
 Measured on `samples/ai_sample.txt` with the local 1.5B model (v1.1, reading ease, higher = easier; original 31.8):
 academic light 50.7, academic full 48.7, formal full 51.6, friendly full 57.2, simple full 62.3

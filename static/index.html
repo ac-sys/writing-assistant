@@ -93,8 +93,9 @@ dialog{border:1px solid var(--line);border-radius:12px;width:min(700px,95vw)}dia
 <!-- SETTINGS -->
 <section id="t-settings" style="display:none">
  <div class="card"><b>Local model (offline, free)</b>
-  <div class="row" style="margin-top:8px"><select id="st-local"></select></div>
-  <p class="mute">Downloaded once on first use, then works without internet. The 1.5B model writes better; the 0.5B model is about 2-3× faster on slower PCs.</p></div>
+  <div class="row" style="margin-top:8px"><label>Model <select id="st-local"></select></label>
+   <label>CPU Quantization <select id="st-quant"><option value="int8">Dynamic INT8 (fastest on CPU, low RAM)</option><option value="bfloat16">BFloat16 (half memory, balanced)</option><option value="float32">Float32 (uncompressed)</option></select></label></div>
+  <p class="mute">Downloaded once on first use, then works without internet. The 0.5B and 360M models are 3-5× faster on CPU; Dynamic INT8 cuts memory in half and accelerates CPU inference.</p></div>
  <div class="card"><b>Optional: online model (higher quality)</b>
   <p class="mute">Any OpenAI-compatible service: OpenAI <code>https://api.openai.com/v1</code>, xAI Grok <code>https://api.x.ai/v1</code>, Groq <code>https://api.groq.com/openai/v1</code>, or a local server such as Ollama <code>http://localhost:11434/v1</code>. Your text is sent to that service. If it fails, the local model is used.</p>
   <div class="row"><label>Preset <select id="st-preset"><option value="">Custom</option></select></label><a id="st-keylink" target="_blank" class="mute"></a></div>
@@ -116,14 +117,24 @@ async function api(path,opt={}){const r=await fetch(path,opt);const ct=r.headers
 const post=(p,b)=>api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
 function show(t){if(!['rewrite','feedback','rules','settings'].includes(t))t='rewrite';document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.t==t));['rewrite','feedback','rules','settings'].forEach(x=>$('#t-'+x).style.display=x==t?'':'none');if(t=='rules')loadRules();if(t=='settings')loadSettings()}
-async function upload(input,target){const f=input.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);try{const d=await api('/api/extract',{method:'POST',body:fd});$(target).value=d.text;count()}catch(e){alert(e.message)}}
+let UPLOADED_STYLES=[];
+async function upload(input,target){const f=input.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);try{const d=await api('/api/extract',{method:'POST',body:fd});$(target).value=d.text;if(target=='#rw-in')UPLOADED_STYLES=d.styles||[];count()}catch(e){alert(e.message)}}
 $('#rw-file').onchange=e=>upload(e.target,'#rw-in');$('#fb-file').onchange=e=>upload(e.target,'#fb-in');
 function count(){const n=($('#rw-in').value.match(/\S+/g)||[]).length;$('#rw-count').textContent=n+' words'}$('#rw-in').oninput=count;
 function renderDiff(ops){return ops.map(([k,t])=>k=='eq'?esc(t):k=='ins'?'<ins>'+esc(t)+'</ins>':'<del>'+esc(t)+'</del>').join('')}
 async function doRewrite(text){$('#rw-go').disabled=true;$('#rw-msg').textContent='Starting... (the first run loads the model, which can take a minute)';$('#rw-bar').style.width='2%';
  try{const {job_id}=await post('/api/rewrite',{text,tone:$('#rw-tone').value,strength:$('#rw-strength').value,british:$('#rw-brit').checked,plain_words:$('#rw-plain').checked,readability_check:$('#rw-rcheck').checked});
- for(;;){await new Promise(r=>setTimeout(r,1200));const j=await api('/api/jobs/'+job_id);$('#rw-bar').style.width=Math.max(2,j.progress*100)+'%';$('#rw-msg').textContent=j.message;
-  if(j.status=='error')throw new Error(j.message);if(j.status=='done'){showResult(j.result);break}}}
+ await new Promise((resolve,reject)=>{
+  if(!window.EventSource){return resolve(null)}
+  const es=new EventSource('/api/jobs/'+job_id+'/stream');
+  es.onmessage=ev=>{const j=JSON.parse(ev.data);$('#rw-bar').style.width=Math.max(2,j.progress*100)+'%';$('#rw-msg').textContent=j.message;
+   if(j.partial){$('#rw-out').style.display='';$('#rw-result').value=j.partial}
+   if(j.status=='error'){es.close();reject(new Error(j.message))}if(j.status=='done'){es.close();showResult(j.result);resolve(true)}};
+  es.onerror=()=>{es.close();resolve(null)};
+ }).then(async ok=>{if(ok)return;
+  for(;;){await new Promise(r=>setTimeout(r,800));const j=await api('/api/jobs/'+job_id);$('#rw-bar').style.width=Math.max(2,j.progress*100)+'%';$('#rw-msg').textContent=j.message;
+   if(j.partial){$('#rw-out').style.display='';$('#rw-result').value=j.partial}
+   if(j.status=='error')throw new Error(j.message);if(j.status=='done'){showResult(j.result);break}}})}
  catch(e){$('#rw-msg').innerHTML='<span class="err">'+esc(e.message)+'</span>'}finally{$('#rw-go').disabled=false}}
 function metricsTable(rb){if(!rb)return'';const rows=[['Reading ease (higher = easier)','flesch_reading_ease',1],['Grade level (lower = easier)','flesch_kincaid_grade',-1],['Fog index (lower = easier)','gunning_fog',-1],['Average sentence (words)','avg_sentence_words',-1],['Longest sentence (words)','longest_sentence',-1],['Sentence-length variation','sentence_length_variation',1],['Words','words',0]];
  return `<table class="mt"><tr><th>Readability</th><th>Before</th><th>After</th><th></th></tr>`+rows.map(([l,k,dir])=>{const a=rb.before[k],b=rb.after[k];const d=Math.round((b-a)*10)/10;const cls=dir==0||d==0?'':((d>0)==(dir>0)?'up':'down');return `<tr><td>${l}</td><td>${a}</td><td>${b}</td><td class="${cls}">${d>0?'+':''}${d}</td></tr>`}).join('')+`</table><div class="note">${rb.before.reading_ease_label} → ${rb.after.reading_ease_label}${rb.retries?` · ${rb.retries} plain-language retr${rb.retries==1?'y':'ies'} after a harder-to-read draft`:''}</div>`}
@@ -132,7 +143,7 @@ function showResult(r){$('#rw-metrics').innerHTML=metricsTable(r.readability);$(
 $('#rw-go').onclick=()=>{const t=$('#rw-in').value.trim();if(!t)return alert('Paste or upload some text first');doRewrite(t)};
 $('#rw-again').onclick=()=>doRewrite($('#rw-in').value.trim());
 $('#rw-copy').onclick=()=>{navigator.clipboard.writeText($('#rw-result').value);$('#rw-copy').textContent='Copied'};
-$('#rw-docx').onclick=async()=>{const r=await fetch('/api/export/docx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('#rw-result').value})});const b=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='edited.docx';a.click()};
+$('#rw-docx').onclick=async()=>{const r=await fetch('/api/export/docx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('#rw-result').value,styles:UPLOADED_STYLES})});const b=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='edited.docx';a.click()};
 $('#rw-fb').onclick=()=>{$('#fb-in').value=$('#rw-result').value;show('feedback');runFeedback()};
 // FEEDBACK
 let FB=null;
@@ -183,10 +194,10 @@ $('#ru-try-go').onclick=async()=>{const d=await post('/api/rules/test',{text:$('
 let PRESETS={};
 async function loadSettings(){const s=await api('/api/settings');PRESETS=s.presets||{};const ps=$('#st-preset');if(ps.options.length<2)Object.entries(PRESETS).forEach(([k,p])=>ps.add(new Option(p.label,k)));
  ps.value=Object.keys(PRESETS).find(k=>PRESETS[k].api_base==s.api_base)||'';showKeyLink();
- $('#st-env').textContent=s.key_source=='GROQ_API_KEY'?'Using the GROQ_API_KEY environment variable from this PC (Groq preset).':(s.groq_env?'A GROQ_API_KEY environment variable is set; it is used when no key is saved here.':'');const sel=$('#st-local');sel.innerHTML=Object.entries(s.local_models).map(([k,v])=>`<option value="${k}">${k} — ${v}</option>`).join('');sel.value=s.local_model;$('#st-use').checked=s.use_api;$('#st-base').value=s.api_base;$('#st-model').value=s.api_model;$('#st-key').value=s.api_key}
+ $('#st-env').textContent=s.key_source=='GROQ_API_KEY'?'Using the GROQ_API_KEY environment variable from this PC (Groq preset).':(s.groq_env?'A GROQ_API_KEY environment variable is set; it is used when no key is saved here.':'');const sel=$('#st-local');sel.innerHTML=Object.entries(s.local_models).map(([k,v])=>`<option value="${k}">${k} — ${v}</option>`).join('');sel.value=s.local_model;if($('#st-quant'))$('#st-quant').value=s.local_quant||'int8';$('#st-use').checked=s.use_api;$('#st-base').value=s.api_base;$('#st-model').value=s.api_model;$('#st-key').value=s.api_key}
 function showKeyLink(){const p=PRESETS[$('#st-preset').value];const a=$('#st-keylink');if(p){a.href=p.key_url;a.textContent='Get a '+p.label.split(' (')[0]+' key';}else{a.textContent=''}}
 $('#st-preset').onchange=()=>{const p=PRESETS[$('#st-preset').value];if(p){$('#st-base').value=p.api_base;$('#st-model').value=p.api_model;$('#st-use').checked=true}showKeyLink()};
-$('#st-save').onclick=async()=>{await post('/api/settings',{preset:$('#st-preset').value||null,local_model:$('#st-local').value,use_api:$('#st-use').checked,api_base:$('#st-base').value,api_model:$('#st-model').value,api_key:$('#st-key').value});$('#st-msg').textContent='Saved.'};
+$('#st-save').onclick=async()=>{await post('/api/settings',{preset:$('#st-preset').value||null,local_model:$('#st-local').value,local_quant:$('#st-quant')?$('#st-quant').value:'int8',use_api:$('#st-use').checked,api_base:$('#st-base').value,api_model:$('#st-model').value,api_key:$('#st-key').value});$('#st-msg').textContent='Saved.'};
 $('#st-test').onclick=async()=>{$('#st-msg').textContent='Testing...';try{const d=await post('/api/settings/test',{});$('#st-msg').textContent='Connected: "'+d.reply+'" in '+d.seconds+'s'}catch(e){$('#st-msg').textContent='Failed: '+e.message}};
 if(location.hash)show(location.hash.slice(1));
 </script>

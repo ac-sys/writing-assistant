@@ -6,8 +6,10 @@ from pathlib import Path
 
 DATA = Path(os.environ.get("WA_DATA", Path(__file__).resolve().parent.parent / "data"))
 LOCAL_MODELS = {
-    "Qwen/Qwen2.5-1.5B-Instruct": "Quality (1.5B, ~3 GB download, needs ~8 GB RAM)",
-    "Qwen/Qwen2.5-0.5B-Instruct": "Fast (0.5B, ~1 GB download, needs ~4 GB RAM)",
+    "Qwen/Qwen2.5-0.5B-Instruct": "Ultra-Fast (0.5B int8/bfloat16, ~1 GB download, ~1.5 GB RAM, 3-5x faster)",
+    "Qwen/Qwen2.5-1.5B-Instruct": "Quality (1.5B int8/bfloat16, ~3 GB download, ~3.5 GB RAM)",
+    "HuggingFaceTB/SmolLM2-360M-Instruct": "Featherweight (360M, ~700 MB download, ~1 GB RAM, instant CPU)",
+    "Qwen/Qwen2.5-1.5B-Instruct-GGUF": "GGUF 4-bit (1.5B Q4_K_M via llama-cpp, ~1 GB download, fastest CPU)",
 }
 PRESETS = {
     "groq": {"label": "Groq (recommended: free tier, fast)", "api_base": "https://api.groq.com/openai/v1",
@@ -20,7 +22,8 @@ PRESETS = {
                "key_url": "https://ollama.com", "env": None},
 }
 DEFAULTS = {
-    "local_model": "Qwen/Qwen2.5-1.5B-Instruct",
+    "local_model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "local_quant": "int8",
     "use_api": False,
     "api_base": "https://api.groq.com/openai/v1",
     "api_key": "",

@@ -10,8 +10,10 @@ def submit(fn, *args, **kw):
     jid = uuid.uuid4().hex[:12]
     JOBS[jid] = {"id": jid, "status": "queued", "progress": 0.0, "message": "Queued", "created": time.time()}
 
-    def progress(p, msg):
+    def progress(p, msg, partial=None):
         JOBS[jid].update(progress=round(p, 3), message=msg)
+        if partial is not None:
+            JOBS[jid]["partial"] = partial
 
     def run():
         JOBS[jid]["status"] = "running"

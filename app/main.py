@@ -1,11 +1,12 @@
 """Writing Assistant - FastAPI app. Run: uvicorn app.main:app --port 8200"""
+import asyncio
 import io
 import json
 import logging
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Body
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config, jobs, plain as P, rules as R
@@ -13,7 +14,7 @@ from .feedback import readability
 from .diff import word_diff
 from .feedback import analyse
 from .rewrite import rewrite, test_api, TONES, STRENGTH
-from .textutils import extract_text, normalise
+from .textutils import extract_text, extract_text_with_styles, normalise
 
 logging.basicConfig(level=logging.INFO)
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -52,12 +53,12 @@ async def extract(file: UploadFile = File(...)):
     if len(data) > 15 * 1024 * 1024:
         raise HTTPException(413, "File too large (max 15 MB)")
     try:
-        text = extract_text(file.filename, data)
+        text, styles = extract_text_with_styles(file.filename, data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(400, f"Could not read the file: {e}")
-    return {"filename": file.filename, "text": text, "chars": len(text)}
+    return {"filename": file.filename, "text": text, "chars": len(text), "styles": styles}
 
 
 @app.post("/api/rewrite")
@@ -84,6 +85,28 @@ def job(jid: str):
     return j
 
 
+@app.get("/api/jobs/{jid}/stream")
+async def job_stream(jid: str):
+    if jid not in jobs.JOBS:
+        raise HTTPException(404, "Unknown job")
+
+    async def event_gen():
+        last_state = None
+        while True:
+            j = jobs.JOBS.get(jid)
+            if not j:
+                break
+            state = (j.get("status"), j.get("progress"), j.get("message"), j.get("partial"))
+            if state != last_state:
+                last_state = state
+                yield f"data: {json.dumps(j)}\n\n"
+            if j.get("status") in ("done", "error"):
+                break
+            await asyncio.sleep(0.15)
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
 @app.post("/api/feedback")
 def feedback(payload: dict = Body(...)):
     t = _text(payload)
@@ -102,9 +125,16 @@ def diff(payload: dict = Body(...)):
 def export_docx(payload: dict = Body(...)):
     import docx
     d = docx.Document()
-    for p in str(payload.get("text", "")).split("\n"):
-        if p.strip():
-            d.add_paragraph(p.strip())
+    styles = payload.get("styles") or []
+    paras = [p.strip() for p in str(payload.get("text", "")).split("\n") if p.strip()]
+    for idx, p in enumerate(paras):
+        style_name = styles[idx] if idx < len(styles) else None
+        if not style_name and len(p.split()) < 10 and not p.endswith((".", "!", "?", ":", ";")):
+            style_name = "Heading 2"
+        try:
+            d.add_paragraph(p, style=style_name if style_name in d.styles else None)
+        except Exception:
+            d.add_paragraph(p)
     buf = io.BytesIO()
     d.save(buf)
     return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -5,6 +5,20 @@ import re
 SUPPORTED = (".txt", ".md", ".docx", ".pdf")
 
 
+def extract_text_with_styles(filename: str, data: bytes) -> tuple[str, list[str]]:
+    name = (filename or "").lower()
+    if name.endswith(".docx"):
+        import docx
+        d = docx.Document(io.BytesIO(data))
+        parts, styles = [], []
+        for p in d.paragraphs:
+            if p.text.strip():
+                parts.append(p.text.strip())
+                styles.append(getattr(p.style, "name", "Normal") or "Normal")
+        return normalise("\n\n".join(parts)), styles
+    return extract_text(filename, data), []
+
+
 def extract_text(filename: str, data: bytes) -> str:
     name = (filename or "").lower()
     if name.endswith(".pdf"):

@@ -102,7 +102,7 @@ def fake(monkeypatch):
     def make(outputs):
         fm = FakeModel(outputs)
         monkeypatch.setenv("WA_NO_MODEL", "0")
-        monkeypatch.setattr(RW.LocalModel, "get", classmethod(lambda cls, name: fm))
+        monkeypatch.setattr(RW.LocalModel, "get", classmethod(lambda cls, name, quant="int8": fm))
         return fm
     return make
 
@@ -292,6 +292,45 @@ def test_tone_scoped_replace_rules():
     assert "tech" not in out.split() and "stuff" not in out and "lots of" not in out
     out, _ = R.apply_replacements("Students use lots of tech stuff.", rules, tone="friendly")
     assert out == "Students use lots of tech stuff."
+
+
+def test_docx_extract_and_export_preserves_styles():
+    import io, docx
+    from app.textutils import extract_text_with_styles
+    from app.main import export_docx
+    doc = docx.Document()
+    doc.add_paragraph("Introduction", style="Heading 1")
+    doc.add_paragraph("First body paragraph here.", style="Normal")
+    buf = io.BytesIO()
+    doc.save(buf)
+    text, styles = extract_text_with_styles("test.docx", buf.getvalue())
+    assert styles == ["Heading 1", "Normal"]
+    resp = export_docx({"text": text, "styles": styles})
+    out_doc = docx.Document(io.BytesIO(resp.body))
+    assert [p.style.name for p in out_doc.paragraphs] == ["Heading 1", "Normal"]
+
+
+def test_parallel_api_chunks_and_partial_progress(monkeypatch):
+    from app import config
+    config.save({"use_api": True, "api_key": "sk-test", "api_base": "https://api.groq.com/openai/v1"})
+    monkeypatch.setattr(RW, "api_generate", lambda s, m, t, mx: "Clear, simple sentence here for readers.")
+    partials = []
+    def on_prog(p, msg, partial=None):
+        if partial:
+            partials.append(partial)
+    txt = "First paragraph has several words that will be rewritten clearly.\n\nSecond paragraph also has several words to rewrite clearly."
+    res = RW.rewrite(txt, progress=on_prog)
+    assert res["chunks"] == 2
+    assert "api" in res["backends"]
+    assert len(partials) >= 1
+
+
+def test_local_model_quant_settings():
+    from app import config
+    s = config.save({"local_model": "HuggingFaceTB/SmolLM2-360M-Instruct", "local_quant": "int8"})
+    assert s["local_model"] == "HuggingFaceTB/SmolLM2-360M-Instruct"
+    assert s["local_quant"] == "int8"
+    assert "HuggingFaceTB/SmolLM2-360M-Instruct" in config.public()["local_models"]
 
 
 def test_data_heavy_and_quote_sentences_are_kept_out_of_model():
